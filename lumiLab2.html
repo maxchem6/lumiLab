@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LumiLab Pro - Photoacid & Förster Cycle Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
+
+    <div class="container mx-auto p-4 max-w-7xl">
+        <header class="mb-6 border-b border-gray-800 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400">
+                    🧪 LumiLab Pro: Photoacid & Förster Cycle Analyzer
+                </h1>
+                <p class="text-gray-400 text-sm mt-1">Quantify Excited-State Proton Transfers (ESPT) and thermodynamic cycles in real time.</p>
+            </div>
+            <div class="bg-gray-900 px-4 py-2 rounded-lg border border-gray-800 text-left self-stretch sm:self-auto">
+                <span class="text-xs text-gray-400 block font-semibold uppercase tracking-wider">Spectral Resolution</span>
+                <select id="resolutionMode" class="bg-transparent text-teal-400 font-bold focus:outline-none cursor-pointer w-full sm:w-auto">
+                    <option value="high" class="bg-gray-900 text-white">High Res (77K Cryogenic Mode)</option>
+                    <option value="low" class="bg-gray-900 text-white">Low Res (Room Temp Solution)</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="bg-gray-900 p-5 rounded-xl shadow-2xl border border-gray-800 h-fit flex flex-col gap-5">
+                <div>
+                    <h2 class="text-lg font-bold text-white mb-3 flex items-center gap-2">⚛️ Target Chromophore</h2>
+                    <select id="moleculeSelect" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        <option value="quinine">Quinine System (Non-Photoacid Control)</option>
+                        <option value="naphthol">β-Naphthol (Classic UV Photoacid)</option>
+                        <option value="hpts">HPTS / Pyranine (Visible Green Photoacid)</option>
+                    </select>
+                </div>
+
+                <hr class="border-gray-800">
+
+                <div>
+                    <h2 class="text-lg font-bold text-white mb-3">🎛️ Quantum Mechanics Toolbox</h2>
+                    
+                    <div class="mb-5">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400 font-medium">Excitation Wavelength (λ<sub>ex</sub>)</span>
+                            <span id="exValue" class="text-indigo-400 font-mono font-bold">330 nm</span>
+                        </div>
+                        <input type="range" id="exSlider" min="280" max="460" value="330" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                    </div>
+
+                    <div class="mb-5">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400 font-medium">Geometric Displacement (Huang-Rhys, <i>S</i>)</span>
+                            <span id="sValue" class="text-amber-400 font-mono font-bold">1.0</span>
+                        </div>
+                        <input type="range" id="sSlider" min="0.1" max="2.5" step="0.1" value="1.0" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400 font-medium">Vibrational Framework Mode (ω)</span>
+                            <span id="omegaValue" class="text-emerald-400 font-mono font-bold">1400 cm⁻¹</span>
+                        </div>
+                        <input type="range" id="omegaSlider" min="1100" max="1600" step="50" value="1400" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    </div>
+                </div>
+
+                <div id="envCard" class="bg-gray-950 p-3 rounded-lg border border-gray-800">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2" id="envTitle">Quinine Matrix</h3>
+                    <div id="quinineEnv">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400">Halide Quencher [Cl⁻]</span>
+                            <span id="quencherValue" class="text-red-400 font-bold font-mono">0.00 M</span>
+                        </div>
+                        <input type="range" id="quencherSlider" min="0" max="0.1" step="0.01" value="0" class="w-full h-1 bg-gray-800 appearance-none accent-red-500">
+                    </div>
+                    <div id="photoacidEnv" class="hidden">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400">Solution pH Environment</span>
+                            <span id="phValue" class="text-pink-400 font-bold font-mono">5.0</span>
+                        </div>
+                        <input type="range" id="phSlider" min="1.0" max="13.0" step="0.1" value="5.0" class="w-full h-1 bg-gray-800 appearance-none accent-pink-500">
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 flex flex-col gap-4">
+                <div class="bg-gray-900 p-4 rounded-xl border border-gray-800 shadow-2xl relative">
+                    <div class="relative w-full" style="height: 400px;">
+                        <canvas id="vibronicChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-gray-900 p-4 rounded-xl border border-gray-800 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">📊 Spectral Footprints</h3>
+                        <div id="quantumInterpretation" class="text-xs text-gray-300 space-y-1.5"></div>
+                    </div>
+                    <div class="border-l border-gray-800 md:pl-4">
+                        <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-1">📐 Physical State Tracking</h3>
+                        <p id="symmetryInterpretation" class="text-xs text-gray-300 leading-relaxed"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="forsterSection" class="bg-gray-900 p-6 rounded-xl border border-gray-800 shadow-2xl hidden">
+            <h2 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 mb-2">
+                📐 The Förster Cycle Thermodynamic Laboratory
+            </h2>
+            <p class="text-gray-400 text-xs mb-6">Analyze how electronic excitation changes the molecular dipole, radically increasing proton acidity ($pK_a \rightarrow pK_a^*$).</p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                <div class="lg:col-span-2 grid grid-cols-3 gap-2 bg-gray-950 p-4 rounded-xl border border-gray-800 text-center relative font-mono text-xs">
+                    
+                    <div class="p-3 bg-indigo-950/40 border border-indigo-800/60 rounded-lg">
+                        <span class="text-indigo-400 font-bold block">ROH* (Excited Acid)</span>
+                        <span id="f_E00_acid" class="text-gray-400 text-[11px]">E₀₀ = -- cm⁻¹</span>
+                    </div>
+                    <div class="flex items-center justify-center text-amber-500 font-bold text-lg">
+                        ⇄ <span class="text-[10px] ml-1 text-gray-400">pK<sub>a</sub>* = <span id="f_pkaStar" class="text-amber-400 font-bold">--</span></span>
+                    </div>
+                    <div class="p-3 bg-pink-950/40 border border-pink-800/60 rounded-lg">
+                        <span class="text-pink-400 font-bold block">RO⁻* + H⁺ (Excited Base)</span>
+                        <span id="f_E00_base" class="text-gray-400 text-[11px]">E₀₀ = -- cm⁻¹</span>
+                    </div>
+
+                    <div class="text-teal-400 font-bold py-2">▲ absorption<br>▼ emission</div>
+                    <div></div>
+                    <div class="text-fuchsia-400 font-bold py-2">▲ absorption<br>▼ emission</div>
+
+                    <div class="p-3 bg-gray-900 border border-gray-700 rounded-lg">
+                        <span class="text-gray-300 font-bold block">ROH (Ground Acid)</span>
+                        <span class="text-gray-500 text-[10px]">Reference Energy = 0</span>
+                    </div>
+                    <div class="flex items-center justify-center text-emerald-500 font-bold text-lg">
+                        ⇄ <span class="text-[10px] ml-1 text-gray-400">pK<sub>a</sub> = <span id="f_pkaGround" class="text-emerald-400 font-bold">--</span></span>
+                    </div>
+                    <div class="p-3 bg-gray-900 border border-gray-700 rounded-lg">
+                        <span class="text-gray-300 font-bold block">RO⁻ + H⁺ (Ground Base)</span>
+                        <span id="f_dgGround" class="text-gray-400 text-[11px]">ΔG° = -- kJ/mol</span>
+                    </div>
+                </div>
+
+                <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 flex flex-col gap-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Thermodynamic Equations Mapped</h3>
+                    <div class="space-y-2 text-xs font-mono">
+                        <div class="p-2 bg-gray-900 rounded border border-gray-800">
+                            <span class="text-gray-400 block mb-1">ΔE₀₀ (Acid Protonated):</span>
+                            <span id="calc_de_acid" class="text-indigo-300 font-bold">-- kJ/mol</span>
+                        </div>
+                        <div class="p-2 bg-gray-900 rounded border border-gray-800">
+                            <span class="text-gray-400 block mb-1">ΔE₀₀ (Conjugate Base Anion):</span>
+                            <span id="calc_de_base" class="text-pink-300 font-bold">-- kJ/mol</span>
+                        </div>
+                        <div class="p-2 bg-amber-950/30 rounded border border-amber-800/40">
+                            <span class="text-amber-400 block font-semibold mb-1">Förster ΔpK_a Calculation:</span>
+                            <div id="calc_delta_pka" class="text-white font-bold">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Parameters ---
+        let state = {
+            molecule: 'quinine',
+            resolution: 'high',
+            lambdaEx: 330,
+            S: 1.0,
+            omega: 1400,
+            quencher: 0.0,
+            ph: 5.0
+        };
+
+        const wavelengths = [];
+        for (let w = 260; w <= 600; w += 2) { wavelengths.push(w); }
+
+        function factorial(n) {
+            if (n === 0 || n === 1) return 1;
+            let r = 1; for (let i = 2; i <= n; i++) r *= i; return r;
+        }
+
+        function getFCFactor(v, S) {
+            return (Math.pow(S, v) * Math.exp(-S)) / factorial(v);
+        }
+
+        // --- Chart Configuration ---
+        const ctx = document.getElementById('vibronicChart').getContext('2d');
+        const vibronicChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: wavelengths,
+                datasets: [
+                    { label: 'Absorption (S₀ → S₁ Transitions)', data: [], borderColor: '#6366f1', borderWidth: 2, borderDash: [3, 3], pointRadius: 0, yAxisID: 'yLeft' },
+                    { label: 'Fluorescence (S₁ → S₀ Transitions)', data: [], borderColor: '#ec4899', backgroundColor: 'rgba(236, 72, 153, 0.06)', fill: true, borderWidth: 2.5, pointRadius: 0, yAxisID: 'yRight' },
+                    { label: 'Excitation Source Line', data: [], borderColor: '#eab308', borderWidth: 1.5, pointRadius: 0, yAxisID: 'yLeft' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Wavelength (nm)', color: '#9ca3af' }, grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+                    yLeft: { type: 'linear', position: 'left', title: { display: true, text: 'Molar Absorptivity (ε)', color: '#818cf8' }, min: 0, max: 1.3, grid: { color: '#1f2937' }, ticks: { color: '#818cf8' } },
+                    yRight: { type: 'linear', position: 'right', title: { display: true, text: 'Fluorescence Output Intensity', color: '#f472b6' }, min: 0, max: 130, grid: { drawOnChartArea: false }, ticks: { color: '#f472b6' } }
+                },
+                plugins: { legend: { labels: { color: '#f3f4f6', boxWidth: 20 } } }
+            }
+        });
+
+        // --- Core Simulation Engine ---
+        function runPhysicsSimulation() {
+            const width = state.resolution === 'high' ? 320 : 1550; 
+            let absSpectrum = new Array(wavelengths.length).fill(0);
+            let emSpectrum = new Array(wavelengths.length).fill(0);
+            let beamLine = new Array(wavelengths.length).fill(0);
+
+            let calculatedForsterMetrics = null;
+
+            // --- MOLECULE MODE: QUININE CONTROL ---
+            if (state.molecule === 'quinine') {
+                let originWavelength = 375;
+                let E_00 = 10000000 / originWavelength;
+                let absAtLaser = 0;
+                
+                wavelengths.forEach((w, idx) => {
+                    let E_probe = 10000000 / w;
+                    let sumAbs = 0;
+                    for (let vPrime = 0; vPrime <= 5; vPrime++) {
+                        sumAbs += getFCFactor(vPrime, state.S) * Math.exp(-Math.pow((E_probe - (E_00 + vPrime * state.omega)) / width, 2));
+                    }
+                    absSpectrum[idx] = sumAbs;
+                    if (Math.abs(w - state.lambdaEx) < 2) absAtLaser = sumAbs;
+                });
+
+                let scaleQ = 1.0 / (1.0 + 110.0 * state.quencher);
+
+                wavelengths.forEach((w, idx) => {
+                    let E_probe = 10000000 / w;
+                    let sumEm = 0;
+                    for (let v = 0; v <= 5; v++) {
+                        sumEm += getFCFactor(v, state.S) * Math.exp(-Math.pow((E_probe - (E_00 - v * state.omega)) / width, 2));
+                    }
+                    emSpectrum[idx] = sumEm * absAtLaser * scaleQ * 90;
+                    if (Math.abs(w - state.lambdaEx) <= 1.5) beamLine[idx] = 1.1;
+                });
+
+            // --- MOLECULE MODE: BETA-NAPHTHOL ---
+            } else if (state.molecule === 'naphthol') {
+                let pKa = 9.5; let pKa_star = 2.8;
+                let E_00_acid = 10000000 / 365; // ~27397 cm⁻¹
+                let E_00_base = 10000000 / 420; // ~23809 cm⁻¹
+
+                let f_acid_ground = 1.0 / (1.0 + Math.pow(10, state.ph - pKa));
+                let f_base_ground = 1.0 - f_acid_ground;
+                let f_base_excited = 1.0 / (1.0 + Math.pow(10, pKa_star - state.ph));
+                let f_acid_excited = 1.0 - f_base_excited;
+
+                let absAtLaser = 0;
+
+                wavelengths.forEach((w, idx) => {
+                    let E_probe = 10000000 / w;
+                    let sumAbsAcid = 0; let sumAbsBase = 0;
+                    for (let vPrime = 0; vPrime <= 5; vPrime++) {
+                        let fc = getFCFactor(vPrime, state.S);
+                        sumAbsAcid += fc * Math.exp(-Math.pow((E_probe - (E_00_acid + vPrime * state.omega)) / width, 2));
+                        sumAbsBase += fc * Math.exp(-Math.pow((E_probe - ((E_00_acid - 2000) + vPrime * state.omega)) / width, 2));
+                    }
+                    absSpectrum[idx] = (f_acid_ground * sumAbsAcid) + (f_base_ground * sumAbsBase * 0.7);
+                    if (Math.abs(w - state.lambdaEx) < 2) absAtLaser = absSpectrum[idx];
+                });
+
+                wavelengths.forEach((w, idx) => {
+                    let E_probe = 10000000 / w;
+                    let sumEmAcid = 0; let sumEmBase = 0;
+                    for (let v = 0; v <= 5; v++) {
+                        let fc = getFCFactor(v, state.S);
+                        sumEmAcid += fc * Math.exp(-Math.pow((E_probe - (E_00_acid - v * state.omega)) / width, 2));
+                        sumEmBase += fc * Math.exp(-Math.pow((E_probe - (E_00_base - v * state.omega)) / width, 2));
+                    }
+                    emSpectrum[idx] = ((f_acid_excited * sumEmAcid) + (f_base_excited * sumEmBase)) * absAtLaser * 95;
+                    if (Math.abs(w - state.lambdaEx) <= 1.5) beamLine[idx] = 1.1;
+                });
+
+                calculatedForsterMetrics = { pKa, pKa_star, E_acid: E_00_acid, E_base: E_00_base };
+
+            // --- MOLECULE MODE: HPTS (PYRANINE) ---
+            } else if (state.molecule === 'hpts') {
+                let pKa = 7.3; let pKa_star = 1.4;
+                let E_00_acid = 10000000 / 410; // Neutral acid line (~24390 cm⁻¹)
+                let E_00_base = 10000000 / 485; // Deprotonated base line (~20618 cm⁻¹)
+
+                let f_acid_ground = 1.0 / (1.0 + Math.pow(10, state.ph - pKa));
+                let f_base_ground = 1.0 - f_acid_ground;
+                let f_base_excited = 1.0 / (1.0 + Math.pow(10, pKa_star - state.ph));
+                let f_acid_excited = 1.0 - f_base_excited;
+
+                let absAtLaser = 0;
+
+                wavelengths.forEach((w, idx) => {
+                    let E_probe = 10000000 / w;
+                    let sumAbsAcid = 0; let sumAbsBase = 0;
+                    for (let vPrime = 0; vPrime <= 5; vPrime++) {
+                        let fc = getFCFactor(vPrime, state.S);
+                        sumAbsAcid += fc * Math.exp(-Math.pow((E_probe - (E_00_acid + vPrime * state.omega)) / width, 2));
+                        sumAbsBase += fc * Math.exp(-Math.pow((E_probe - ((E_00_acid - 2300) + vPrime * state.omega)) / width, 2));
+                    }
+                    absSpectrum[idx] = (f_acid_ground * sumAbsAcid) + (f_base_ground * sumAbsBase * 0.8);
+                    if (Math.abs(w - state.lambdaEx) < 2) absAtLaser = absSpectrum[idx];
+                });
+
+                wavelengths.forEach((w, idx) => {
+                    let E_probe = 10000000 / w;
+                    let sumEmAcid = 0; let sumEmBase = 0;
+                    for (let v = 0; v <= 5; v++) {
+                        let fc = getFCFactor(v, state.S);
+                        sumEmAcid += fc * Math.exp(-Math.pow((E_probe - (E_00_acid - v * state.omega)) / width, 2));
+                        sumEmBase += fc * Math.exp(-Math.pow((E_probe - (E_00_base - v * state.omega)) / width, 2));
+                    }
+                    emSpectrum[idx] = ((f_acid_excited * sumEmAcid) + (f_base_excited * sumEmBase)) * absAtLaser * 95;
+                    if (Math.abs(w - state.lambdaEx) <= 1.5) beamLine[idx] = 1.1;
+                });
+
+                calculatedForsterMetrics = { pKa, pKa_star, E_acid: E_00_acid, E_base: E_00_base };
+            }
+
+            // Push updates directly into canvas framework
+            vibronicChart.data.datasets[0].data = absSpectrum;
+            vibronicChart.data.datasets[1].data = emSpectrum;
+            vibronicChart.data.datasets[2].data = beamLine;
+            vibronicChart.update();
+
+            updateAcademicInterpretations(calculatedForsterMetrics);
+        }
+
+        // --- Engine Processing The Live Förster Cycle Visual Dashboard Box ---
+        function updateAcademicInterpretations(metrics) {
+            const qi = document.getElementById('quantumInterpretation');
+            const si = document.getElementById('symmetryInterpretation');
+            const forsterBlock = document.getElementById('forsterSection');
+
+            let highestVibronicAbs = Math.floor(state.S);
+            
+            qi.innerHTML = `
+                <div>• <b class="text-indigo-400">S₀ → S₁ Progression Stack:</b> Ground state <i>v=0</i> transitions upwards to excited vibronic levels. Spaced exactly by <b>${state.omega} cm⁻¹</b>.</div>
+                <div>• <b class="text-pink-400">S₁ → S₀ Decoupling Steps:</b> Relaxation downwards from <i>v'=0</i> to ground vibrational steps. Spaced identically to absorption tracking.</div>
+                <div class="mt-2 p-1.5 bg-gray-950 rounded text-amber-300 font-mono text-[11px]">
+                    Highest Franck-Condon Node Probability: v(0) → v'(${highestVibronicAbs})
+                </div>
+            `;
+
+            let symStr = "";
+            if (state.S <= 0.3) {
+                symStr = `<b>High Structural Conservation:</b> Minor geometric changes occur post-excitation. The 0-0 transition dominates. Mirror imaging is highly preserved.`;
+            } else if (state.S > 0.3 && state.S <= 1.4) {
+                symStr = `<b>Balanced Vibronic Coupling:</b> Moderate geometric relaxation occurs along core local ring dimensions. Energy updates distribute evenly across 0-0, 0-1, and 0-2 modes.`;
+            } else {
+                symStr = `<b>Significant Geometry Distortions:</b> The excited state structure is heavily shifted. The 0-0 origin line is highly suppressed by a Franck-Condon blockade.`;
+            }
+            si.innerHTML = symStr;
+
+            // Render/Hide and calculate values for the Förster Cycle panel
+            if (!metrics) {
+                forsterBlock.classList.add('hidden');
+                return;
+            }
+            forsterBlock.classList.remove('hidden');
+
+            // --- Conversion Constants ---
+            const cm1_to_kJmol = 0.0119626; // Wavenumbers to kJ/mol factor
+            
+            let kJ_acid = metrics.E_acid * cm1_to_kJmol;
+            let kJ_base = metrics.E_base * cm1_to_kJmol;
+            
+            // Delta Delta E calculations
+            let deltaDeltaE = kJ_acid - kJ_base; // in kJ/mol
+            
+            // Förster pKa shift conversion step via RT natural log limits: (2.303 * R * T at 298.15K is 5.708 kJ/mol)
+            let derivedDeltaPka = deltaDeltaE / 5.7081;
+            let derivedPkaStar = metrics.pKa - derivedDeltaPka;
+
+            // Update live HTML display elements
+            document.getElementById('f_E00_acid').innerText = `E₀₀ = ${Math.round(metrics.E_acid)} cm⁻¹`;
+            document.getElementById('f_E00_base').innerText = `E₀₀ = ${Math.round(metrics.E_base)} cm⁻¹`;
+            document.getElementById('f_pkaGround').innerText = metrics.pKa.toFixed(1);
+            document.getElementById('f_pkaStar').innerText = derivedPkaStar.toFixed(2);
+            document.getElementById('f_dgGround').innerText = `ΔG° = ${(metrics.pKa * 5.71).toFixed(1)} kJ/mol`;
+
+            document.getElementById('calc_de_acid').innerText = `${kJ_acid.toFixed(1)} kJ/mol`;
+            document.getElementById('calc_de_base').innerText = `${kJ_base.toFixed(1)} kJ/mol`;
+            
+            document.getElementById('calc_delta_pka').innerHTML = `
+                ΔpK<sub>a</sub> derived: +${derivedDeltaPka.toFixed(2)} units<br>
+                Calculated pK<sub>a</sub>*: <span class="text-amber-400 font-bold">${derivedPkaStar.toFixed(2)}</span>
+            `;
+        }
+
+        // --- Controller Binding Routines ---
+        const bindInput = (id, targetField, valueSuffix, formatter = val => val) => {
+            const element = document.getElementById(id);
+            const valueSpan = document.getElementById(id.replace('Slider', 'Value'));
+            element.addEventListener('input', (e) => {
+                let parsed = parseFloat(e.target.value);
+                state[targetField] = parsed;
+                if (valueSpan) valueSpan.innerText = `${formatter(parsed)}${valueSuffix}`;
+                runPhysicsSimulation();
+            });
+        };
+
+        bindInput('exSlider', 'lambdaEx', ' nm');
+        bindInput('sSlider', 'S', '', val => val.toFixed(1));
+        bindInput('omegaSlider', 'omega', ' cm⁻¹');
+        bindInput('quencherSlider', 'quencher', ' M', val => val.toFixed(2));
+        bindInput('phSlider', 'ph', '', val => val.toFixed(1));
+
+        document.getElementById('resolutionMode').addEventListener('change', (e) => {
+            state.resolution = e.target.value;
+            runPhysicsSimulation();
+        });
+
+        document.getElementById('moleculeSelect').addEventListener('change', (e) => {
+            state.molecule = e.target.value;
+            const qEnv = document.getElementById('quinineEnv');
+            const pEnv = document.getElementById('photoacidEnv');
+            const envTitle = document.getElementById('envTitle');
+            const exSlider = document.getElementById('exSlider');
+            const exValue = document.getElementById('exValue');
+
+            if (state.molecule === 'quinine') {
+                qEnv.classList.remove('hidden');
+                pEnv.classList.add('hidden');
+                envTitle.innerText = "Quinine Matrix";
+                exSlider.min = 290; exSlider.max = 390; exSlider.value = 340;
+            } else if (state.molecule === 'naphthol') {
+                qEnv.classList.add('hidden');
+                pEnv.classList.remove('hidden');
+                envTitle.innerText = "β-Naphthol Kinetics";
+                exSlider.min = 280; exSlider.max = 400; exSlider.value = 330;
+            } else {
+                qEnv.classList.add('hidden');
+                pEnv.classList.remove('hidden');
+                envTitle.innerText = "HPTS / Pyranine Matrix";
+                exSlider.min = 340; exSlider.max = 490; exSlider.value = 400;
+            }
+            state.lambdaEx = parseFloat(exSlider.value);
+            exValue.innerText = `${state.lambdaEx} nm`;
+            runPhysicsSimulation();
+        });
+
+        runPhysicsSimulation();
+    </script>
+</body>
+</html>
