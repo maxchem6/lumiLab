@@ -1,0 +1,176 @@
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 1.25rem;">
+  <div>
+    <label style="font-size: 13px; color: var(--text-secondary);">ความเข้มข้นกรด (M)</label>
+    <input type="range" id="ca" min="0.02" max="0.5" step="0.01" value="0.10" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>0.02</span><span id="ca-out" style="font-weight:500; color:var(--text-primary);">0.10 M</span><span>0.50</span></div>
+  </div>
+  <div>
+    <label style="font-size: 13px; color: var(--text-secondary);">ปริมาตรกรดเริ่มต้น (mL)</label>
+    <input type="range" id="va" min="10" max="50" step="1" value="25" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>10</span><span id="va-out" style="font-weight:500; color:var(--text-primary);">25 mL</span><span>50</span></div>
+  </div>
+  <div>
+    <label style="font-size: 13px; color: var(--text-secondary);">ความเข้มข้นเบส (M)</label>
+    <input type="range" id="cb" min="0.02" max="0.5" step="0.01" value="0.10" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>0.02</span><span id="cb-out" style="font-weight:500; color:var(--text-primary);">0.10 M</span><span>0.50</span></div>
+  </div>
+  <div>
+    <label style="font-size: 13px; color: var(--text-secondary);">ปริมาตรเบสที่หยด (mL)</label>
+    <input type="range" id="vb" min="0" max="60" step="0.2" value="0" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>0</span><span id="vb-out" style="font-weight:500; color:var(--text-primary);">0.0 mL</span><span>60</span></div>
+  </div>
+</div>
+
+<div style="display:flex; align-items:center; gap:20px; margin-bottom:1.25rem;">
+  <div style="width:70px; height:90px; border-radius:0 0 10px 10px; border:0.5px solid var(--border-strong); border-top:none; position:relative; overflow:hidden; background:var(--surface-1); flex-shrink:0;">
+    <div id="liquid" style="position:absolute; bottom:0; left:0; right:0; height:70%; background:#f0997b; transition:background 0.2s;"></div>
+  </div>
+  <div style="display:flex; gap:24px;">
+    <div>
+      <p style="font-size:13px; color:var(--text-secondary); margin:0;">pH</p>
+      <p id="ph-val" style="font-size:32px; font-weight:500; margin:0;">1.40</p>
+    </div>
+    <div>
+      <p style="font-size:13px; color:var(--text-secondary); margin:0;">จุดสมมูล (equivalence)</p>
+      <p id="eq-val" style="font-size:16px; font-weight:500; margin:4px 0 0;">25.0 mL</p>
+    </div>
+    <div>
+      <p style="font-size:13px; color:var(--text-secondary); margin:0;">สถานะ</p>
+      <p id="status-val" style="font-size:16px; font-weight:500; margin:4px 0 0;">กรดเกิน</p>
+    </div>
+  </div>
+</div>
+
+<div style="position: relative; width: 100%; height: 280px;">
+  <canvas id="curveChart" role="img" aria-label="กราฟไทเทรตแสดง pH เทียบกับปริมาตรเบสที่เติม พร้อมจุดแสดงตำแหน่งปัจจุบัน"></canvas>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+function computePH(Ca, Va, Cb, Vb) {
+  const molA = Ca * Va;
+  const molB = Cb * Vb;
+  const totalV = Va + Vb;
+  const excess = molA - molB;
+  if (Math.abs(excess) < 1e-9) return 7.0;
+  if (excess > 0) {
+    const H = excess / totalV;
+    return -Math.log10(H);
+  } else {
+    const OH = -excess / totalV;
+    const pOH = -Math.log10(OH);
+    return 14 - pOH;
+  }
+}
+
+function liquidColor(ph) {
+  if (ph < 8.2) return '#f0997b';
+  if (ph < 9.5) {
+    const t = (ph - 8.2) / 1.3;
+    const r = Math.round(0xf0 + (0xed - 0xf0) * t);
+    const g = Math.round(0x99 + (0x53 - 0x99) * t);
+    const b = Math.round(0x7b + (0x7e - 0x7b) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  return '#d4537e';
+}
+
+const caEl = document.getElementById('ca');
+const vaEl = document.getElementById('va');
+const cbEl = document.getElementById('cb');
+const vbEl = document.getElementById('vb');
+
+let chart;
+
+function buildCurve(Ca, Va, Cb) {
+  const eq = (Ca * Va) / Cb;
+  const maxV = Math.max(eq * 2, 20);
+  const points = [];
+  const steps = 120;
+  for (let i = 0; i <= steps; i++) {
+    const vb = (maxV * i) / steps;
+    points.push({ x: Math.round(vb * 100) / 100, y: Math.round(computePH(Ca, Va, Cb, vb) * 100) / 100 });
+  }
+  vbEl.max = Math.round(maxV);
+  return points;
+}
+
+function update() {
+  const Ca = parseFloat(caEl.value);
+  const Va = parseFloat(vaEl.value);
+  const Cb = parseFloat(cbEl.value);
+  let Vb = parseFloat(vbEl.value);
+  if (Vb > parseFloat(vbEl.max)) { Vb = parseFloat(vbEl.max); vbEl.value = Vb; }
+
+  document.getElementById('ca-out').textContent = Ca.toFixed(2) + ' M';
+  document.getElementById('va-out').textContent = Va.toFixed(0) + ' mL';
+  document.getElementById('cb-out').textContent = Cb.toFixed(2) + ' M';
+  document.getElementById('vb-out').textContent = Vb.toFixed(1) + ' mL';
+
+  const eq = (Ca * Va) / Cb;
+  document.getElementById('eq-val').textContent = eq.toFixed(1) + ' mL';
+
+  const ph = computePH(Ca, Va, Cb, Vb);
+  document.getElementById('ph-val').textContent = ph.toFixed(2);
+
+  const statusEl = document.getElementById('status-val');
+  if (Vb < eq - 0.05) statusEl.textContent = 'กรดเกิน';
+  else if (Vb > eq + 0.05) statusEl.textContent = 'เบสเกิน';
+  else statusEl.textContent = 'จุดสมมูล';
+
+  document.getElementById('liquid').style.background = liquidColor(ph);
+
+  const curve = buildCurve(Ca, Va, Cb);
+  chart.data.datasets[0].data = curve;
+  chart.data.datasets[1].data = [{ x: Vb, y: ph }];
+  chart.options.scales.x.max = curve[curve.length - 1].x;
+  chart.update('none');
+}
+
+[caEl, vaEl, cbEl, vbEl].forEach(el => el.addEventListener('input', update));
+
+const ctx = document.getElementById('curveChart');
+const rootStyles = getComputedStyle(document.documentElement);
+const muted = rootStyles.getPropertyValue('--text-muted').trim() || '#898781';
+const gridColor = '#e1e0d9';
+
+chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    datasets: [
+      {
+        label: 'pH curve',
+        data: [],
+        parsing: false,
+        borderColor: '#2a78d6',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.15
+      },
+      {
+        label: 'current point',
+        data: [],
+        parsing: false,
+        type: 'scatter',
+        backgroundColor: '#d95926',
+        pointRadius: 6,
+        pointBorderWidth: 2,
+        pointBorderColor: '#fcfcfb'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    scales: {
+      x: { type: 'linear', min: 0, title: { display: true, text: 'ปริมาตรเบสที่เติม (mL)', color: muted }, grid: { color: gridColor }, ticks: { color: muted } },
+      y: { min: 0, max: 14, title: { display: true, text: 'pH', color: muted }, grid: { color: gridColor }, ticks: { color: muted } }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+
+update();
+</script>
