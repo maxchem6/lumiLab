@@ -1,0 +1,281 @@
+<h2 class="sr-only">แบบจำลองการไทเทรตกรดอ่อนด้วยเบสแก่ หรือเบสอ่อนด้วยกรดแก่ คำนวณ pH จากสมดุลจริง พร้อมกราฟ จุดสมมูล และสีอินดิเคเตอร์</h2>
+
+<div style="display:flex; gap:8px; margin-bottom:1.25rem;">
+  <button id="mode-acid" style="flex:1; border-width:2px;">กรดอ่อน + เบสแก่</button>
+  <button id="mode-base" style="flex:1;">เบสอ่อน + กรดแก่</button>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 1.25rem;">
+  <div>
+    <label id="pk-label" style="font-size: 13px; color: var(--text-secondary);">pKa ของกรดอ่อน</label>
+    <input type="range" id="pk" min="1" max="9" step="0.1" value="4.76" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>1</span><span id="pk-out" style="font-weight:500; color:var(--text-primary);">4.76</span><span>9</span></div>
+  </div>
+  <div>
+    <label id="v0-label" style="font-size: 13px; color: var(--text-secondary);">ปริมาตรเริ่มต้น V₀ (mL)</label>
+    <input type="range" id="v0" min="10" max="50" step="1" value="25" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>10</span><span id="v0-out" style="font-weight:500; color:var(--text-primary);">25 mL</span><span>50</span></div>
+  </div>
+  <div>
+    <label id="c0-label" style="font-size: 13px; color: var(--text-secondary);">ความเข้มข้นเริ่มต้น C₀ (M)</label>
+    <input type="range" id="c0" min="0.01" max="0.5" step="0.01" value="0.10" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>0.01</span><span id="c0-out" style="font-weight:500; color:var(--text-primary);">0.10 M</span><span>0.50</span></div>
+  </div>
+  <div>
+    <label id="ct-label" style="font-size: 13px; color: var(--text-secondary);">ความเข้มข้นไทแทรนต์ (M)</label>
+    <input type="range" id="ct" min="0.01" max="0.5" step="0.01" value="0.10" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>0.01</span><span id="ct-out" style="font-weight:500; color:var(--text-primary);">0.10 M</span><span>0.50</span></div>
+  </div>
+  <div style="grid-column: 1 / -1;">
+    <label id="vt-label" style="font-size: 13px; color: var(--text-secondary);">ปริมาตรไทแทรนต์ที่หยด Vt (mL)</label>
+    <input type="range" id="vt" min="0" max="50" step="0.1" value="0" style="width:100%;" />
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);"><span>0</span><span id="vt-out" style="font-weight:500; color:var(--text-primary);">0.0 mL</span><span id="vt-max-out">50</span></div>
+  </div>
+</div>
+
+<div style="display:flex; flex-wrap:wrap; gap:20px; margin-bottom:1rem;">
+  <div>
+    <p style="font-size:13px; color:var(--text-secondary); margin:0;">pH ปัจจุบัน</p>
+    <p id="ph-val" style="font-size:32px; font-weight:500; margin:0;">3.38</p>
+  </div>
+  <div>
+    <p style="font-size:13px; color:var(--text-secondary); margin:0;">จุดสมมูล (Veq)</p>
+    <p id="eq-val" style="font-size:16px; font-weight:500; margin:4px 0 0;">25.0 mL, pH 8.72</p>
+  </div>
+  <div>
+    <p style="font-size:13px; color:var(--text-secondary); margin:0;">ความแม่นยำสูตรบัฟเฟอร์อย่างง่าย</p>
+    <p id="valid-val" style="font-size:16px; font-weight:500; margin:4px 0 0;">ใช้ได้ (dissociation < 5%)</p>
+  </div>
+</div>
+
+<div style="position: relative; width: 100%; height: 280px; margin-bottom: 1.25rem;">
+  <canvas id="curveChart" role="img" aria-label="กราฟไทเทรต pH เทียบปริมาตรไทแทรนต์ที่เติม แสดงจุดสมมูลและช่วงที่การประมาณบัฟเฟอร์ใช้ไม่ได้"></canvas>
+</div>
+
+<p style="font-size:13px; color:var(--text-secondary); margin:0 0 1rem;">ช่วงที่การแตกตัวเกิน 5% (สูตรบัฟเฟอร์อย่างง่ายใช้ไม่ได้): <span id="invalid-range" style="color:var(--text-primary); font-weight:500;">-</span></p>
+
+<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+  <div id="mr-card" style="background:var(--surface-1); border-radius:var(--radius); padding:0.75rem; text-align:center;">
+    <div id="mr-swatch" style="width:100%; height:28px; border-radius:6px; margin-bottom:8px; border:0.5px solid var(--border);"></div>
+    <p style="font-size:13px; font-weight:500; margin:0;">Methyl red</p>
+    <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0;">ช่วง 4.4–6.2</p>
+  </div>
+  <div id="bb-card" style="background:var(--surface-1); border-radius:var(--radius); padding:0.75rem; text-align:center;">
+    <div id="bb-swatch" style="width:100%; height:28px; border-radius:6px; margin-bottom:8px; border:0.5px solid var(--border);"></div>
+    <p style="font-size:13px; font-weight:500; margin:0;">Bromothymol blue</p>
+    <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0;">ช่วง 6.0–7.6</p>
+  </div>
+  <div id="pp-card" style="background:var(--surface-1); border-radius:var(--radius); padding:0.75rem; text-align:center;">
+    <div id="pp-swatch" style="width:100%; height:28px; border-radius:6px; margin-bottom:8px; border:0.5px solid var(--border);"></div>
+    <p style="font-size:13px; font-weight:500; margin:0;">Phenolphthalein</p>
+    <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0;">ช่วง 8.2–10.0</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpColor(c1, c2, t) {
+  t = Math.max(0, Math.min(1, t));
+  return 'rgb(' + Math.round(lerp(c1[0],c2[0],t)) + ',' + Math.round(lerp(c1[1],c2[1],t)) + ',' + Math.round(lerp(c1[2],c2[2],t)) + ')';
+}
+
+let mode = 'acid'; // 'acid' = weak acid + strong base, 'base' = weak base + strong acid
+
+function computePoint(pK, C0, V0, Ct, Vt) {
+  const K = Math.pow(10, -pK);
+  const mol0 = C0 * V0;
+  const molT = Ct * Vt;
+  const totalV = V0 + Vt;
+  const remain = mol0 - molT;
+
+  if (remain > 1e-9) {
+    const C_weak0 = remain / totalV;
+    const C_conj0 = molT / totalV;
+    const b = K + C_conj0, c = -K * C_weak0;
+    const z = (-b + Math.sqrt(b * b - 4 * c)) / 2;
+    let pH;
+    if (mode === 'acid') { pH = -Math.log10(z); }
+    else { const pOH = -Math.log10(z); pH = 14 - pOH; }
+    const alpha1 = z / C_weak0;
+    const alpha2 = C_conj0 > 1e-12 ? z / C_conj0 : 0;
+    const valid = alpha1 <= 0.05 && alpha2 <= 0.05;
+    return { pH, valid };
+  } else {
+    const C_conjTotal = mol0 / totalV;
+    const C_excess = Math.max(0, molT - mol0) / totalV;
+    const Kconj = 1e-14 / K;
+    const b = Kconj + C_excess, c = -Kconj * C_conjTotal;
+    const w = (-b + Math.sqrt(b * b - 4 * c)) / 2;
+    const total = C_excess + w;
+    let pH;
+    if (mode === 'acid') { const pOH = -Math.log10(total); pH = 14 - pOH; }
+    else { pH = -Math.log10(total); }
+    return { pH, valid: true };
+  }
+}
+
+function methylRedColor(pH) {
+  if (pH < 4.4) return 'rgb(226,75,74)';
+  if (pH > 6.2) return 'rgb(237,161,0)';
+  return lerpColor([226,75,74],[237,161,0],(pH-4.4)/1.8);
+}
+function bromothymolColor(pH) {
+  if (pH < 6.0) return 'rgb(237,161,0)';
+  if (pH > 7.6) return 'rgb(55,138,221)';
+  return lerpColor([237,161,0],[55,138,221],(pH-6.0)/1.6);
+}
+function phenolphthaleinColor(pH) {
+  if (pH < 8.2) return 'rgb(245,244,239)';
+  if (pH > 10.0) return 'rgb(212,83,126)';
+  return lerpColor([245,244,239],[212,83,126],(pH-8.2)/1.8);
+}
+
+const pkEl = document.getElementById('pk');
+const v0El = document.getElementById('v0');
+const c0El = document.getElementById('c0');
+const ctEl = document.getElementById('ct');
+const vtEl = document.getElementById('vt');
+const modeAcidBtn = document.getElementById('mode-acid');
+const modeBaseBtn = document.getElementById('mode-base');
+let chart;
+let validFlags = [];
+
+const LABELS = {
+  acid: {
+    pk: 'pKa ของกรดอ่อน', c0: 'ความเข้มข้นกรดอ่อน C₀ (M)', v0: 'ปริมาตรกรดอ่อนเริ่มต้น V₀ (mL)',
+    ct: 'ความเข้มข้นเบสแก่ (M)', vt: 'ปริมาตรเบสแก่ที่หยด Vt (mL)', xAxis: 'ปริมาตรเบสที่เติม (mL)'
+  },
+  base: {
+    pk: 'pKb ของเบสอ่อน', c0: 'ความเข้มข้นเบสอ่อน C₀ (M)', v0: 'ปริมาตรเบสอ่อนเริ่มต้น V₀ (mL)',
+    ct: 'ความเข้มข้นกรดแก่ (M)', vt: 'ปริมาตรกรดแก่ที่หยด Vt (mL)', xAxis: 'ปริมาตรกรดที่เติม (mL)'
+  }
+};
+
+function applyLabels() {
+  const L = LABELS[mode];
+  document.getElementById('pk-label').textContent = L.pk;
+  document.getElementById('c0-label').textContent = L.c0;
+  document.getElementById('v0-label').textContent = L.v0;
+  document.getElementById('ct-label').textContent = L.ct;
+  document.getElementById('vt-label').textContent = L.vt;
+  chart.options.scales.x.title.text = L.xAxis;
+}
+
+function buildCurve(pK, C0, V0, Ct) {
+  const Veq = (C0 * V0) / Ct;
+  const maxV = Math.max(Veq * 2, 15);
+  vtEl.max = Math.round(maxV * 10) / 10;
+  document.getElementById('vt-max-out').textContent = Math.round(maxV);
+  const steps = 150;
+  const points = [];
+  validFlags = [];
+  for (let i = 0; i <= steps; i++) {
+    const vt = (maxV * i) / steps;
+    const r = computePoint(pK, C0, V0, Ct, vt);
+    points.push({ x: Math.round(vt * 100) / 100, y: Math.round(r.pH * 100) / 100 });
+    validFlags.push(r.valid);
+  }
+  return { points, Veq };
+}
+
+function findInvalidRanges(points, flags) {
+  const ranges = [];
+  let start = null;
+  for (let i = 0; i < flags.length; i++) {
+    if (!flags[i] && start === null) start = points[i].x;
+    if (flags[i] && start !== null) { ranges.push([start, points[i - 1].x]); start = null; }
+  }
+  if (start !== null) ranges.push([start, points[points.length - 1].x]);
+  return ranges;
+}
+
+function update() {
+  const pK = parseFloat(pkEl.value);
+  const V0 = parseFloat(v0El.value);
+  const C0 = parseFloat(c0El.value);
+  const Ct = parseFloat(ctEl.value);
+  let Vt = parseFloat(vtEl.value);
+
+  document.getElementById('pk-out').textContent = pK.toFixed(2) + ' (K=' + Math.pow(10,-pK).toExponential(1) + ')';
+  document.getElementById('v0-out').textContent = V0.toFixed(0) + ' mL';
+  document.getElementById('c0-out').textContent = C0.toFixed(2) + ' M';
+  document.getElementById('ct-out').textContent = Ct.toFixed(2) + ' M';
+
+  const { points, Veq } = buildCurve(pK, C0, V0, Ct);
+  if (Vt > parseFloat(vtEl.max)) { Vt = parseFloat(vtEl.max); vtEl.value = Vt; }
+  document.getElementById('vt-out').textContent = Vt.toFixed(1) + ' mL';
+
+  const current = computePoint(pK, C0, V0, Ct, Vt);
+  document.getElementById('ph-val').textContent = current.pH.toFixed(2);
+  document.getElementById('valid-val').textContent = current.valid ? 'ใช้ได้ (dissociation < 5%)' : 'ใช้ไม่ได้ (dissociation > 5%)';
+  document.getElementById('valid-val').style.color = current.valid ? 'var(--text-primary)' : 'var(--text-danger)';
+
+  const eqResult = computePoint(pK, C0, V0, Ct, Veq);
+  document.getElementById('eq-val').textContent = Veq.toFixed(1) + ' mL, pH ' + eqResult.pH.toFixed(2);
+
+  const ranges = findInvalidRanges(points, validFlags);
+  document.getElementById('invalid-range').textContent = ranges.length
+    ? ranges.map(r => r[0].toFixed(1) + '–' + r[1].toFixed(1) + ' mL').join(' และ ')
+    : 'ไม่มี';
+
+  document.getElementById('mr-swatch').style.background = methylRedColor(current.pH);
+  document.getElementById('bb-swatch').style.background = bromothymolColor(current.pH);
+  document.getElementById('pp-swatch').style.background = phenolphthaleinColor(current.pH);
+
+  [['mr-card',4.4,6.2],['bb-card',6.0,7.6],['pp-card',8.2,10.0]].forEach(([id,lo,hi]) => {
+    const el = document.getElementById(id);
+    const suit = eqResult.pH >= lo - 0.5 && eqResult.pH <= hi + 0.5;
+    el.style.border = suit ? '2px solid var(--border-accent)' : '0.5px solid var(--border)';
+  });
+
+  applyLabels();
+  chart.data.datasets[0].data = points;
+  chart.data.datasets[1].data = [{ x: Veq, y: eqResult.pH }];
+  chart.data.datasets[2].data = [{ x: Vt, y: current.pH }];
+  chart.options.scales.x.max = points[points.length - 1].x;
+  chart.update('none');
+}
+
+function setMode(newMode) {
+  mode = newMode;
+  modeAcidBtn.style.borderWidth = mode === 'acid' ? '2px' : '';
+  modeBaseBtn.style.borderWidth = mode === 'base' ? '2px' : '';
+  update();
+}
+
+modeAcidBtn.addEventListener('click', () => setMode('acid'));
+modeBaseBtn.addEventListener('click', () => setMode('base'));
+[pkEl, v0El, c0El, ctEl, vtEl].forEach(el => el.addEventListener('input', update));
+
+const ctx = document.getElementById('curveChart');
+const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#898781';
+const gridColor = '#e1e0d9';
+
+chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    datasets: [
+      {
+        label: 'pH curve', data: [], parsing: false, borderWidth: 2, pointRadius: 0, tension: 0.15,
+        segment: {
+          borderColor: (segCtx) => (validFlags[segCtx.p0DataIndex] ? '#2a78d6' : '#d95926'),
+          borderDash: (segCtx) => (validFlags[segCtx.p0DataIndex] ? [] : [4, 3])
+        }
+      },
+      { label: 'equivalence point', data: [], parsing: false, type: 'scatter', backgroundColor: '#52514e', pointRadius: 6, pointStyle: 'rectRot', pointBorderWidth: 2, pointBorderColor: '#fcfcfb' },
+      { label: 'current point', data: [], parsing: false, type: 'scatter', backgroundColor: '#d95926', pointRadius: 6, pointBorderWidth: 2, pointBorderColor: '#fcfcfb' }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    scales: {
+      x: { type: 'linear', min: 0, title: { display: true, text: 'ปริมาตรเบสที่เติม (mL)', color: muted }, grid: { color: gridColor }, ticks: { color: muted } },
+      y: { min: 0, max: 14, title: { display: true, text: 'pH', color: muted }, grid: { color: gridColor }, ticks: { color: muted } }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+
+update();
+</script>
